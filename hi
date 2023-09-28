@@ -1,0 +1,33 @@
+//bettery.ino
+
+void BatteryLoop()
+{
+
+  static auto updateTimestamp = millis();
+
+    float currentVoltage = nicla::getCurrentBatteryVoltage();
+
+    auto operatingStatus = nicla::getOperatingStatus();
+
+    switch(operatingStatus) {
+      case OperatingStatus::Charging:
+      nicla::leds.setColor(255,100,0); // Yellow
+        break;
+      case OperatingStatus::ChargingComplete:
+        nicla::leds.setColor(green);
+        
+        // This will stop further charging until enableCharging() is called again.
+        nicla::disableCharging();
+        break;
+      case OperatingStatus::Error:
+        nicla::leds.setColor(red);
+        break;
+      case OperatingStatus::Ready:
+        nicla::leds.setColor(blue);
+        break;
+      default:
+        nicla::leds.setColor(off);
+        break;
+    }
+
+}
