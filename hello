@@ -1,0 +1,454 @@
+//bmm150
+
+SensorXYZ mag(SENSOR_ID_MAG);
+
+
+//mag.begin();
+
+void Turn_On_Sensor(){
+    static auto lastCheck= millis();
+    char Magnetometer[20];
+    mag.begin();
+
+    BHY2.update();
+
+    if (millis() - lastCheck >= 1000) {
+
+    lastCheck = millis();
+    sprintf(Magnetometer,"M: %.2f %.2f %.2f", mag.x(), mag.y(), mag.z());
+    TXCharacteristic.writeValue(Magnetometer);  
+}
+}
+void Turn_Off_Sensor(){
+    
+    mag.end();
+    //sprintf(Magnetometer,"M: %.2f %.2f %.2f", 0, 0, 0);
+    TXCharacteristic.writeValue("Turned off sensor");
+    delay(2000);
+}
+void compass(){
+    Turn_Off_Sensor();
+    float heading = atan2(mag.x(), mag.y());
+
+    if (heading < 0) {
+        heading += 2 * PI;
+    }
+    if (heading > 2 * PI) {
+        heading -= 2 * PI;
+    }
+    float headingDegrees = heading * 180 / M_PI;
+
+    Serial.print("Heading: ");
+    Serial.println(headingDegrees);
+    if(headingDegrees == 0){
+      Serial.println("North");
+      TXCharacteristic.writeValue("North");
+    }
+    else if(headingDegrees>0&&headingDegrees<90){
+      Serial.println("North West");
+      TXCharacteristic.writeValue("North West");
+
+    }
+    else if(headingDegrees == 90){
+      Serial.println("West");
+      TXCharacteristic.writeValue("West");
+    }
+    else if(headingDegrees>90&&headingDegrees<180){
+      Serial.println("South West");
+      TXCharacteristic.writeValue("South West");
+    }
+    else if(headingDegrees == 180){
+      Serial.println("South");
+      TXCharacteristic.writeValue("South");
+    }
+    else if(headingDegrees>180&&headingDegrees<270){
+      Serial.println("South East");
+      TXCharacteristic.writeValue("South East");
+    }
+    else if(headingDegrees == 270){
+      Serial.println("East");
+      TXCharacteristic.writeValue("East");
+    }
+    else if(headingDegrees>180&&headingDegrees<270){
+      Serial.println("North East");
+      TXCharacteristic.writeValue("North East");
+    }
+    
+} 
+void SetMode(char setmode){
+    if(setmode == '1'){
+        Turn_On_Sensor();
+    }
+    else if(setmode == '0'){
+        Turn_Off_Sensor();
+    }
+    else if(setmode == '2'){
+      compass();
+    }
+}
+
+void loop3(){
+
+  if(BLE.connected())
+  {
+    char a[20] ;
+    RXCharacteristic.readValue(a,20);
+    //const char *b = a.c_str();
+    if(a[0] != '\n')
+  {
+    setmode = a[0]; tem_mode = a[0];
+  }
+  else {setmode = tem_mode;}
+    SetMode(setmode);
+
+  }
+}
+
+ 
+  // Check sensor values every second  
+
+//callbackhandle
+
+void blePeripheralDisconnectHandler(BLEDevice central){
+    nicla::leds.setColor(red);
+    Serial.print("blePeripheralDisconnectHandler\r\n");
+  }
+
+void blePeripheralConnectHandler(BLEDevice central) {
+  // central connected event handler
+  Serial.print("Connected event, central: \r\n");
+  Serial.println(central.address());
+}
+
+  void onTemperatureCharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    float temperatureValue = temperature.value();
+    //temperatureCharacteristic.writeValue(temperatureValue);
+    Serial.println("onTemperatureCharacteristicRead");
+  }
+
+  void onHumidityCharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    uint8_t humidityValue = humidity.value() + 0.5f;  //since we are truncating the float type to a uint8_t, we want to round it
+    //humidityCharacteristic.writeValue(humidityValue);
+    Serial.println("onHumidityCharacteristicRead");
+  }
+
+  void onPressureCharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    float pressureValue = pressure.value();
+    //pressureCharacteristic.writeValue(pressureValue);
+    Serial.println("onPressureCharacteristicRead");
+  }
+
+  void onBsecCharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    float airQuality = float(bsec.iaq());
+    //bsecCharacteristic.writeValue(airQuality);
+    Serial.println("onBsecCharacteristicRead");
+  }
+
+  void onCo2CharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    uint32_t co2 = bsec.co2_eq();
+    //co2Characteristic.writeValue(co2);
+    Serial.println("onCo2CharacteristicRead");
+  }
+
+  void onGasCharacteristicRead(BLEDevice central, BLECharacteristic characteristic){
+    unsigned int g = gas.value();
+    //gasCharacteristic.writeValue(g);
+    Serial.println("onGasCharacteristicRead");
+  }
+
+  
+  void onRgbLedCharacteristicWrite(BLEDevice central, BLECharacteristic characteristic){
+    byte r = RXCharacteristic[0];
+    byte g = RXCharacteristic[1];
+    byte b = RXCharacteristic[2];
+
+    int len = characteristic.valueLength();
+    memset(RXBuffer,0,20);
+    characteristic.readValue(RXBuffer,len);
+    if(String((char *)RXBuffer) == "SLEEP")
+    {
+      Serial.println("Enter sleep mode");
+      EnterSleepMode = 1;
+    }
+    Serial.println((char *)RXBuffer);
+    Serial.print("Data len = ");
+    Serial.println(len);
+    nicla::leds.setColor(r, g, b);
+    Serial.println("onRgbLedCharacteristicWrite");
+  }
+//ledtask
+uint8_t SleepCount = 0;
+void Ledloop() 
+{
+  nicla::leds.setColor(green);
+  delay(300);
+  nicla::leds.setColor(blue);
+  delay(300);
+  if(EnterSleepMode)
+  {
+    SleepCount++;
+    Serial.println(SleepCount);
+  }
+  if(SleepCount >= 30)
+  {
+    SleepCount = 0;
+    Serial.println("Start to sleep mode");
+    nicla::enterShipMode();
+    nicla::enterShipMode();
+    digitalWrite(30, LOW);
+    delay(10000);
+  }
+}
+//nicla
+/*
+  Arduino Nicla Sense ME WEB Bluetooth® Low Energy Sense dashboard demo
+  Hardware required: https://store.arduino.cc/nicla-sense-me
+  1) Upload this sketch to the Arduino Nano Bluetooth® Low Energy sense board
+  2) Open the following web page in the Chrome browser:
+  https://arduino.github.io/ArduinoAI/NiclaSenseME-dashboard/
+  3) Click on the green button in the web page to connect the browser to the board over Bluetooth® Low Energy
+  Web dashboard by D. Pajak
+  Device sketch based on example by Sandeep Mistry and Massimo Banzi
+  Sketch and web dashboard copy-fixed to be used with the Nicla Sense ME by Pablo Marquínez
+  */
+
+  #include "Nicla_System.h"
+  #include "Arduino_BHY2.h"
+  #include <ArduinoBLE.h>
+  #include <Scheduler.h>
+
+  typedef struct __attribute__ ((packed)) sensorData_t
+  {
+    uint8_t SensorType;
+    float Value1;
+    float Value2;
+    float Value3;
+    float Value4;
+  }sensorData_t;
+
+
+  uint8_t RXBuffer[20];
+  float gyroscopeValues[3];
+  float accelerometerValues[3];
+  float quaternionValues[4];
+  uint8_t EnterSleepMode = 0;
+  BLEService service("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+
+  BLECharacteristic RXCharacteristic("6E400002-B5A3-F393-E0A9-E50E24DCCA9E", BLERead | BLEWrite, 20);     // Array of 4x 2 Bytes, XYZW
+  BLECharacteristic TXCharacteristic("6E400003-B5A3-F393-E0A9-E50E24DCCA9E", BLERead | BLENotify,20); // Array of 3 bytes, RGB
+
+  // String to calculate the local and device name
+  String name;
+
+  Sensor temperature(SENSOR_ID_TEMP);
+  Sensor humidity(SENSOR_ID_HUM);
+  Sensor pressure(SENSOR_ID_BARO);
+  Sensor gas(SENSOR_ID_GAS);
+  SensorXYZ gyroscope(SENSOR_ID_GYRO);
+  SensorXYZ accelerometer(SENSOR_ID_ACC);
+  SensorQuaternion quaternion(SENSOR_ID_RV);
+  SensorBSEC bsec(SENSOR_ID_BSEC);
+
+  void setup(){
+    Serial.begin(115200);
+    pinMode(30, OUTPUT);
+    Serial.println("Start");
+
+    nicla::begin();
+    nicla::leds.begin();
+    nicla::leds.setColor(green);
+
+    //Sensors initialization
+    BHY2.begin(NICLA_STANDALONE);
+    temperature.begin();
+    humidity.begin();
+    pressure.begin();
+    gyroscope.begin();
+    accelerometer.begin();
+    quaternion.begin();
+    bsec.begin();
+    gas.begin();
+
+    if (!BLE.begin()){
+      Serial.println("Failed to initialized BLE!");
+
+      while (1)
+        ;
+    }
+
+    String address = BLE.address();
+
+    Serial.print("address = ");
+    Serial.println(address);
+
+    address.toUpperCase();
+
+    name = "Bosch-";
+    name += address[address.length() - 5];
+    name += address[address.length() - 4];
+    name += address[address.length() - 2];
+    name += address[address.length() - 1];
+
+    Serial.print("name = ");
+    Serial.println(name);
+
+    BLE.setLocalName(name.c_str());
+    BLE.setDeviceName(name.c_str());
+    BLE.setAdvertisedService(service);
+
+    // Add all the previously defined Characteristics
+    service.addCharacteristic(RXCharacteristic);
+    service.addCharacteristic(TXCharacteristic);
+
+    // Disconnect event handler
+    BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+    BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+    
+    // Sensors event handlers
+    TXCharacteristic.setEventHandler(BLERead, onHumidityCharacteristicRead);
+    RXCharacteristic.setEventHandler(BLEWritten, onRgbLedCharacteristicWrite);
+
+    BLE.addService(service);
+    BLE.advertise();
+    Scheduler.startLoop(loop2);
+    Scheduler.startLoop(printTask);
+    Scheduler.startLoop(Ledloop);
+    //
+    nicla::setBatteryNTCEnabled(false); // Set to false if your battery doesn't have a NTC.
+    nicla::configureChargingSafetyTimer(ChargingSafetyTimerOption::ThreeHours);
+    nicla::enableCharging(50);
+  }
+
+  void loop()
+  {
+    //while (BLE.connected())
+    SensorUpdata();
+  }
+
+  
+//prin task
+void printTask()
+{
+    Serial.print("gyroscopeValues: ");
+    Serial.print(gyroscopeValues[0]);
+    Serial.print(", ");
+    Serial.print(gyroscopeValues[1]);
+    Serial.print(", ");
+    Serial.println(gyroscopeValues[2]);
+    //
+    Serial.print("accelerometerValues: ");
+    Serial.print(accelerometerValues[0]);
+    Serial.print(", ");
+    Serial.print(accelerometerValues[1]);
+    Serial.print(", ");
+    Serial.println(accelerometerValues[2]);
+    //
+    Serial.print("quaternionValues: ");
+    Serial.print(quaternionValues[0]);
+    Serial.print(", ");
+    Serial.print(quaternionValues[1]);
+    Serial.print(", ");
+    Serial.print(quaternionValues[2]);
+    Serial.print(", ");
+    Serial.println(quaternionValues[3]);
+    //
+    Serial.print("humidity: ");
+    Serial.println(humidity.value() + 0.5f);
+    //
+    Serial.print("temperature: ");
+    Serial.println(temperature.value());
+    float currentVoltage = nicla::getCurrentBatteryVoltage();
+    Serial.print("currentVoltage: ");
+    Serial.println(currentVoltage);
+    delay(4000);
+}
+//sensor update
+void SensorUpdata(void)
+{
+  BHY2.update(10);
+
+  gyroscopeValues[0] = gyroscope.x();
+  gyroscopeValues[1] = gyroscope.y();
+  gyroscopeValues[2] = gyroscope.z();
+
+  accelerometerValues[0] = accelerometer.x();
+  accelerometerValues[1] = accelerometer.y();
+  accelerometerValues[2] = accelerometer.z();
+
+  quaternionValues[0] = quaternion.x();
+  quaternionValues[1] = quaternion.y();
+  quaternionValues[2] = quaternion.z();
+  quaternionValues[3] = quaternion.w();
+}
+//task2.io
+uint8_t SendOutBuff[20];
+sensorData_t DataSendOut = {.SensorType = 0,
+                            .Value1 = 0,
+                            .Value2 = 0,
+                            .Value3 = 0,
+                            .Value4 = 0};
+// Task no.2: blink LED with 0.1 second delay.
+void loop2() 
+{
+  delay(300);
+  if(BLE.connected())
+  {
+    int RSSI = BLE.rssi();
+    sprintf((char*)SendOutBuff,"gyr = %0.4f", gyroscopeValues[0]);
+    DataSendOut.SensorType = SENSOR_ID_ACC;
+    DataSendOut.Value1 = accelerometerValues[0];
+    DataSendOut.Value2 = accelerometerValues[1];
+    DataSendOut.Value3 = accelerometerValues[2];
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_GYRO;
+    DataSendOut.Value1 = gyroscopeValues[0];
+    DataSendOut.Value2 = gyroscopeValues[1];
+    DataSendOut.Value3 = gyroscopeValues[2];
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_RV;
+    DataSendOut.Value1 = quaternionValues[0];
+    DataSendOut.Value2 = quaternionValues[1];
+    DataSendOut.Value3 = quaternionValues[2];
+    DataSendOut.Value4 = quaternionValues[3];
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_TEMP;
+    DataSendOut.Value1 = temperature.value();
+    DataSendOut.Value2 = 0;
+    DataSendOut.Value3 = 0;
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_HUM;
+    DataSendOut.Value1 = humidity.value() + 0.5f;
+    DataSendOut.Value2 = 0;
+    DataSendOut.Value3 = 0;
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_BARO;
+    DataSendOut.Value1 = pressure.value();
+    DataSendOut.Value2 = 0;
+    DataSendOut.Value3 = 0;
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    //
+    DataSendOut.SensorType = SENSOR_ID_GAS;
+    DataSendOut.Value1 = gas.value();
+    DataSendOut.Value2 = 0;
+    DataSendOut.Value3 = 0;
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+    
+    DataSendOut.SensorType = SENSOR_ID_BSEC;
+    DataSendOut.Value1 = float(bsec.iaq());
+    DataSendOut.Value2 = bsec.co2_eq();
+    DataSendOut.Value3 = 0;
+    DataSendOut.Value4 = 0;
+    TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));
+  }
+}
