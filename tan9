@@ -1,0 +1,107 @@
+
+//mag.begin();
+
+void Turn_On_Sensor(){
+    //static auto lastCheck= millis();
+    char Magnetometer[20];
+    //mag.begin();
+
+    BHY2.update();
+
+    //if (millis() - lastCheck >= 3000) {
+
+    //lastCheck = millis();
+    delay(3000);
+    sprintf(Magnetometer,"M: %.2f %.2f %.2f", mag.x(), mag.y(), mag.z());
+    TXCharacteristic.writeValue(Magnetometer); 
+     
+}
+
+void Turn_Off_Sensor(){
+    
+    mag.end();
+    //sprintf(Magnetometer,"M: %.2f %.2f %.2f", 0, 0, 0);
+    TXCharacteristic.writeValue("Turned off sensor");
+    delay(2000);
+}
+void compass(){
+    Turn_On_Sensor();
+    float heading = atan2(mag.x(), mag.y());
+
+    if (heading < 0) {
+        heading += 2 * PI;
+    }
+    if (heading > 2 * PI) {
+        heading -= 2 * PI;
+    }
+    float headingDegrees = heading * 180 / M_PI;
+
+    Serial.print("Heading: ");
+    Serial.println(headingDegrees);
+    if(headingDegrees == 0){
+      Serial.println("North");
+      TXCharacteristic.writeValue("North");
+    }
+    else if(headingDegrees>0&&headingDegrees<90){
+      Serial.println("North West");
+      TXCharacteristic.writeValue("North West");
+
+    }
+    else if(headingDegrees == 90){
+      Serial.println("West");
+      TXCharacteristic.writeValue("West");
+    }
+    else if(headingDegrees>90&&headingDegrees<180){
+      Serial.println("South West");
+      TXCharacteristic.writeValue("South West");
+    }
+    else if(headingDegrees == 180){
+      Serial.println("South");
+      TXCharacteristic.writeValue("South");
+    }
+    else if(headingDegrees>180&&headingDegrees<270){
+      Serial.println("South East");
+      TXCharacteristic.writeValue("South East");
+    }
+    else if(headingDegrees == 270){
+      Serial.println("East");
+      TXCharacteristic.writeValue("East");
+    }
+    else if(headingDegrees>180&&headingDegrees<270){
+      Serial.println("North East");
+      TXCharacteristic.writeValue("North East");
+    }
+    
+} 
+void SetMode(char setmode){
+    if(setmode == '1'){
+        Turn_On_Sensor();
+    }
+    else if(setmode == '0'){
+        Turn_Off_Sensor();
+    }
+    else if(setmode == '2'){
+      compass();
+    }
+}
+
+void loop3(){
+
+  if(BLE.connected())
+  {
+    char a[20] ;
+    RXCharacteristic.readValue(a,20);
+    //const char *b = a.c_str();
+    if(a[0] != '\n')
+  {
+    setmode = a[0]; tem_mode = a[0];
+  }
+  else {setmode = tem_mode;}
+    SetMode(setmode);
+
+  }
+}
+
+ 
+  // Check sensor values every second  
+
