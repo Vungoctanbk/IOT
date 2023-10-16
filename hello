@@ -1,3 +1,159 @@
+//bmm150_ino
+float magnetometerValue[3];
+bool BMM150_Select = true;
+float rate1=1000;
+bool state_cali = false;
+uint32_t latency1=1;
+SensorConfig cfg;
+void Turn_On_Sensor(){   
+      BHY2.update();
+      delay(1000);
+    
+      magnetometerValue[0] = mag.x();
+      magnetometerValue[1] = mag.y();
+      magnetometerValue[2] = mag.z();
+    
+      DataSendOut.SensorType = 15;   
+      DataSendOut.Value1 = magnetometerValue[0];
+      DataSendOut.Value2 = magnetometerValue[1];
+      DataSendOut.Value3 = magnetometerValue[2];
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));   
+     
+}
+
+void Turn_Off_Sensor(){    
+    mag.end();    
+}
+void compass(){
+    float heading = atan2(magnetometerValue[0], magnetometerValue[1]);
+
+    if (heading < 0) {
+        heading += 2 * PI;
+    }
+    if (heading > 2 * PI) {
+        heading -= 2 * PI;
+    }
+    float headingDegrees = heading * 180 / M_PI;
+
+    Serial.print("Heading: ");
+    Serial.println(headingDegrees);
+    if(headingDegrees <20||headingDegrees>340){
+      Serial.println("North");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 1;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees>290&&headingDegrees<340){
+      Serial.println("North West");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 6;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+
+    }
+    else if(headingDegrees >250&&headingDegrees<290){
+      Serial.println("West");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 3;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees>200&&headingDegrees<250){
+      Serial.println("South West");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 8;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees < 200&&headingDegrees > 160){
+      Serial.println("South");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 2;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees>110&&headingDegrees<160){
+      Serial.println("South East");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 7;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees > 70&&headingDegrees < 110){
+      Serial.println("East");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 4;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    else if(headingDegrees>20&&headingDegrees<70){
+      Serial.println("North East");
+      DataSendOut.SensorType = 20;   
+      DataSendOut.Value1 = 5;
+      DataSendOut.Value2 = 0;
+      DataSendOut.Value3 = 0;
+      DataSendOut.Value4 = 0;
+      TXCharacteristic.writeValue((uint8_t *)&DataSendOut,sizeof(DataSendOut));  
+    }
+    
+}
+
+void loopmg(){
+
+  if(BLE.connected())
+  {
+    
+    char a[20] ,b[20];
+    if(BMM150_Select){
+      Turn_On_Sensor();
+      compass();
+      memset(a,0,20);
+      memset(b,0,20);
+      RXCharacteristic.readValue(a,20);
+      Serial.println(a);
+      if(a[0]=='C'&&a[1]=='2'&&a[2]=='1'){
+        strncpy(b,a+3,20);
+        b[19]='\0';
+        rate1 = atof(b);
+        Serial.println(rate1);
+
+      }
+      else if(a[0]=='C'&&a[1]=='2'&&a[2]=='3'){
+        strncpy(b,a+3,20);
+        b[19]='\0';
+        latency1 = atoi(b);
+        Serial.println(latency1); 
+      }
+      mag.begin(rate1,latency1);
+    }
+  }
+}
+
+
+ 
+  // Check sensor values every second  
+
+
+ 
+  // Check sensor values every second  
+
+
 //bmm150
 
 SensorXYZ mag(SENSOR_ID_MAG);
